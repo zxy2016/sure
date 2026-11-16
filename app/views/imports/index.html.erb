@@ -142,4 +142,10 @@
     <%= icon("plus") %>
     <%= t("imports.index.new") %>
   <% end %>
+
+  <%= link_to new_cn_bill_import_path,
+              class: "bg-container-inset inline-flex items-center justify-center gap-2 hover:bg-container-inset-hover rounded-lg px-4 py-2 w-full font-medium text-primary text-sm text-center" do %>
+    <%= icon("file-up") %>
+    <%= t("cn_bill_imports.new.title") %>
+  <% end %>
 <% end %>

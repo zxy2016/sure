@@ -563,6 +563,8 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :cn_bill_imports, only: %i[new create]
+
   resources :imports, only: %i[index new show create update destroy] do
     member do
       post :publish

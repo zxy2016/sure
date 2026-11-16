@@ -1,0 +1,33 @@
+---
+en:
+  cn_bill_imports:
+    channels:
+      wechat: WeChat Pay
+      alipay: Alipay
+      cmb: China Merchants Bank
+    large_transfer_rule_name: Exclude large external transfers from reports
+    new:
+      title: Chinese Bill Import
+      description: Upload WeChat Pay, Alipay and CMB bill exports. They are parsed,
+        cleaned and routed to the right accounts, then reviewed like any other import.
+      how_title: How to export
+      how_wechat: "WeChat: Me → Services → Wallet → Bills → FAQ → Download Bills → For personal reconciliation (xlsx)"
+      how_alipay: "Alipay: Me → Bills → … → Transaction Statement → For personal reconciliation (csv)"
+      how_cmb: "CMB app: search 流水打印 → choose account and period → send PDF to email"
+      channels:
+        wechat: WeChat Pay bill
+        alipay: Alipay bill
+        cmb: CMB statement
+      target_account: Target account
+      auto_create: Auto-create "%{name}"
+      dedup_hint: Re-uploading the same period is safe — duplicates are matched by
+        date, amount and name. Wallet payments made with the CMB card are routed to
+        the bank account and de-duplicated against the statement. Credit-card
+        spending is reported but not imported until card accounts exist.
+      submit: Parse and create imports
+    create:
+      no_files: Please choose at least one bill file.
+      no_rows: No importable transactions found in the uploaded files.
+      success: "Created %{count} import(s) with %{rows} rows. Review and publish to book them."
+      cards_pending: "%{count} credit-card transaction(s) held back (no card account yet)."
+      skipped: "%{count} row(s) skipped (company-paid, closed or refunded)."
