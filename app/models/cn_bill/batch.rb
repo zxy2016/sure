@@ -42,16 +42,19 @@ class CnBill::Batch
     return Result.new(imports: [], cards: [], skipped: [], matched: [], errors: errors) if parsed.values.all?(&:empty?)
 
     accounts = resolve_accounts
-    converter = CnBill::Converter.new(family: @family, cmb_account: accounts[:cmb], self_names: self_names)
+    sweep_account = @family.accounts.find_by(name: CnBill::SWEEP_ACCOUNT_NAME)
+    converter = CnBill::Converter.new(family: @family, cmb_account: accounts[:cmb],
+                                      self_names: self_names, sweep_account: sweep_account)
     result = converter.convert(**parsed)
 
-    ensure_exclusion_rules if result.cmb.any? { |r| r[:tags].to_s.include?(CnBill::LARGE_TRANSFER_TAG) || r[:tags].to_s.include?(CnBill::WEALTH_SWEEP_TAG) }
+    ensure_exclusion_rules(sweep_account: sweep_account)
 
     imports = []
     { wechat: result.wallet, alipay: result.alipay, cmb: result.cmb }.each do |channel, rows|
       next if rows.empty?
       imports << create_import(channel, accounts[channel], rows)
     end
+    imports << create_import(:cmb, sweep_account, result.sweep) if result.sweep.any?
 
     Result.new(imports: imports, cards: result.cards, skipped: result.skipped, matched: result.matched, errors: errors)
   end
@@ -96,12 +99,12 @@ class CnBill::Batch
     end
 
     # Idempotent: one active exclusion rule per tag. Created before publish so
-    # the rules apply when the import syncs.
-    def ensure_exclusion_rules
-      {
-        CnBill::LARGE_TRANSFER_TAG => "cn_bill_imports.large_transfer_rule_name",
-        CnBill::WEALTH_SWEEP_TAG => "cn_bill_imports.wealth_sweep_rule_name"
-      }.each do |tag_name, name_key|
+    # the rules apply when the import syncs. Wealth sweeps only need the rule
+    # when no fund account exists to pair them as transfers.
+    def ensure_exclusion_rules(sweep_account: nil)
+      rules = { CnBill::LARGE_TRANSFER_TAG => "cn_bill_imports.large_transfer_rule_name" }
+      rules[CnBill::WEALTH_SWEEP_TAG] = "cn_bill_imports.wealth_sweep_rule_name" unless sweep_account
+      rules.each do |tag_name, name_key|
         tag = @family.tags.find_or_create_by!(name: tag_name)
         existing = @family.rules.joins(:conditions).where(rule_conditions: { condition_type: "transaction_tag", value: tag.id })
                           .joins(:actions).where(rule_actions: { action_type: "exclude_transaction" }).exists?

@@ -97,6 +97,24 @@ class CnBill::ConverterTest < ActiveSupport::TestCase
       assert_equal "理财申赎", r[:category]
       assert_includes r[:tags], CnBill::WEALTH_SWEEP_TAG
     end
+    assert_empty result.sweep
+  end
+
+  test "wealth sweeps emit mirror legs when the fund account exists" do
+    zzb = @family.accounts.create!(name: CnBill::SWEEP_ACCOUNT_NAME, balance: 0,
+                                   currency: "CNY", accountable: Depository.new(subtype: "savings"))
+    converter = CnBill::Converter.new(family: @family, cmb_account: @cmb, sweep_account: zzb)
+    result = converter.convert(cmb: [
+      bank(date: "2026-01-02", amount: "2571.88", summary: "朝朝宝转出", party: "待清算电子汇差"),
+      bank(date: "2026-01-05", amount: "-1000", summary: "朝朝宝转入", party: "待清算电子汇差")
+    ])
+    assert_equal 2, result.sweep.size
+    out_leg = result.sweep.find { |r| r[:date] == "2026-01-02" }
+    in_leg = result.sweep.find { |r| r[:date] == "2026-01-05" }
+    assert_equal "-2571.88", out_leg[:amount] # fund outflow mirrors bank inflow
+    assert_equal "1000.00", in_leg[:amount]
+    assert_equal "朝朝宝转出至活期", out_leg[:name]
+    assert_equal "活期转入朝朝宝", in_leg[:name]
   end
 
   private

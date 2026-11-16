@@ -14,12 +14,13 @@ class CnBill::Converter
     "医疗健康" => "医疗", "生活服务" => "生活服务", "宠物" => "宠物", "亲友代付" => "人情往来:代付"
   }.freeze
 
-  Result = Struct.new(:wallet, :alipay, :cmb, :cards, :skipped, :matched, keyword_init: true)
+  Result = Struct.new(:wallet, :alipay, :cmb, :sweep, :cards, :skipped, :matched, keyword_init: true)
 
-  def initialize(family:, cmb_account: nil, self_names: [])
+  def initialize(family:, cmb_account: nil, self_names: [], sweep_account: nil)
     @family = family
     @cmb_account = cmb_account
     @self_names = self_names.compact.uniq
+    @sweep_account = sweep_account
   end
 
   def convert(wechat: [], alipay: [], cmb: [])
@@ -27,7 +28,21 @@ class CnBill::Converter
     ali_rows, ali_cards, ali_skipped = convert_alipay(alipay)
     cmb_rows, matched = convert_cmb(cmb, wx_cmb)
 
-    Result.new(wallet: wallet, alipay: ali_rows, cmb: cmb_rows,
+    # When the wealth fund account exists, emit its mirror legs so the
+    # transfer matcher can pair both sides; otherwise sweeps stay tagged
+    # for the exclusion-rule fallback.
+    sweep_rows = []
+    if @sweep_account
+      cmb_rows.select { |r| r[:tags].to_s.include?(CnBill::WEALTH_SWEEP_TAG) }.each do |r|
+        amount = BigDecimal(r[:amount])
+        sweep_rows << CnBill.row(date: r[:date], amount: -amount,
+                                 name: amount.positive? ? "朝朝宝转出至活期" : "活期转入朝朝宝",
+                                 category: "理财申赎", tags: CnBill::WEALTH_SWEEP_TAG,
+                                 notes: "对应招行流水: #{r[:notes]}")
+      end
+    end
+
+    Result.new(wallet: wallet, alipay: ali_rows, cmb: cmb_rows, sweep: sweep_rows,
                cards: wx_cards + ali_cards, skipped: wx_skipped + ali_skipped, matched: matched)
   end
 
