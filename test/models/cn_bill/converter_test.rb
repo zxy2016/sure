@@ -87,6 +87,18 @@ class CnBill::ConverterTest < ActiveSupport::TestCase
     assert_empty result.cmb
   end
 
+  test "wealth sweeps are categorized and tagged for exclusion" do
+    result = @converter.convert(cmb: [
+      bank(date: "2026-01-02", amount: "2571.88", summary: "朝朝宝转出", party: "待清算电子汇差"),
+      bank(date: "2026-01-05", amount: "-1000", summary: "朝朝宝转入", party: "待清算电子汇差")
+    ])
+    assert_equal 2, result.cmb.size
+    result.cmb.each do |r|
+      assert_equal "理财申赎", r[:category]
+      assert_includes r[:tags], CnBill::WEALTH_SWEEP_TAG
+    end
+  end
+
   private
     def wx(overrides = {})
       { date: "2026-10-07", type: "转账", party: "对方", product: "", direction: "支出",

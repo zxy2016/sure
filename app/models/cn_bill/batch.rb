@@ -45,7 +45,7 @@ class CnBill::Batch
     converter = CnBill::Converter.new(family: @family, cmb_account: accounts[:cmb], self_names: self_names)
     result = converter.convert(**parsed)
 
-    ensure_large_transfer_rule if result.cmb.any? { |r| r[:tags].to_s.include?(CnBill::LARGE_TRANSFER_TAG) }
+    ensure_exclusion_rules if result.cmb.any? { |r| r[:tags].to_s.include?(CnBill::LARGE_TRANSFER_TAG) || r[:tags].to_s.include?(CnBill::WEALTH_SWEEP_TAG) }
 
     imports = []
     { wechat: result.wallet, alipay: result.alipay, cmb: result.cmb }.each do |channel, rows|
@@ -68,7 +68,11 @@ class CnBill::Batch
           @family.accounts.find(id)
         else
           name = CnBill::CHANNELS[channel][:account_name]
+          # Prefix fallback: users rename accounts with suffixes like card
+          # numbers ("招商银行储蓄卡(4876)"); auto-creating a second account
+          # would split their history.
           @family.accounts.find_by(name: name) ||
+            @family.accounts.where("name LIKE ?", "#{Account.sanitize_sql_like(name)}%").order(:created_at).first ||
             @family.accounts.create!(name: name, balance: 0, currency: @family.currency,
                                      accountable: Depository.new(subtype: "checking"))
         end
@@ -91,19 +95,24 @@ class CnBill::Batch
       import
     end
 
-    # Idempotent: one active rule per family, keyed by the large-transfer tag.
-    # Created before publish so the rule applies when the import syncs.
-    def ensure_large_transfer_rule
-      tag = @family.tags.find_or_create_by!(name: CnBill::LARGE_TRANSFER_TAG)
-      existing = @family.rules.joins(:conditions).where(rule_conditions: { condition_type: "transaction_tag", value: tag.id })
-                        .joins(:actions).where(rule_actions: { action_type: "exclude_transaction" }).exists?
-      return if existing
+    # Idempotent: one active exclusion rule per tag. Created before publish so
+    # the rules apply when the import syncs.
+    def ensure_exclusion_rules
+      {
+        CnBill::LARGE_TRANSFER_TAG => "cn_bill_imports.large_transfer_rule_name",
+        CnBill::WEALTH_SWEEP_TAG => "cn_bill_imports.wealth_sweep_rule_name"
+      }.each do |tag_name, name_key|
+        tag = @family.tags.find_or_create_by!(name: tag_name)
+        existing = @family.rules.joins(:conditions).where(rule_conditions: { condition_type: "transaction_tag", value: tag.id })
+                          .joins(:actions).where(rule_actions: { action_type: "exclude_transaction" }).exists?
+        next if existing
 
-      @family.rules.create!(
-        name: I18n.t("cn_bill_imports.large_transfer_rule_name"),
-        resource_type: "transaction", active: true,
-        conditions_attributes: [ { condition_type: "transaction_tag", operator: "=", value: tag.id } ],
-        actions_attributes: [ { action_type: "exclude_transaction" } ]
-      )
+        @family.rules.create!(
+          name: I18n.t(name_key),
+          resource_type: "transaction", active: true,
+          conditions_attributes: [ { condition_type: "transaction_tag", operator: "=", value: tag.id } ],
+          actions_attributes: [ { action_type: "exclude_transaction" } ]
+        )
+      end
     end
 end

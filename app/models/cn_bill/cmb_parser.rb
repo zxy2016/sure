@@ -4,8 +4,13 @@
 # opening balance. Text comes from pdftotext -layout (poppler, present in the
 # Docker image); Pdf::TextExtractor is the fallback for dev machines.
 class CnBill::CmbParser
-  LINE = /\A(\d{4}-\d{2}-\d{2})\s+CNY\s+(-?[\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+(\S+)\s+(.+?)\s*\z/
+  # The counterparty is optional on the date line: long names wrap onto the
+  # lines above/below it in the counterparty column (e.g. 朝朝宝 redemptions).
+  LINE = /\A(\d{4}-\d{2}-\d{2})\s+CNY\s+(-?[\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+(\S+)(?:\s+(.+?))?\s*\z/
   RANGE = /(\d{4}-\d{2}-\d{2})\s*--\s*(\d{4}-\d{2}-\d{2})/
+  # Counterparty column starts around character 83 in -layout output; wrapped
+  # fragments are indented at least this far. Headers/footers start earlier.
+  FRAGMENT_COLUMN = 70
 
   # 户名 printed on the statement; used to spot salary transfers from the
   # user's own payroll card (汇入汇款 with the user as counterparty).
@@ -41,15 +46,40 @@ class CnBill::CmbParser
   end
 
   def parse_text(text)
-    text.lines.filter_map do |line|
+    lines = text.lines.map(&:chomp)
+    lines.each_with_index.filter_map do |line, i|
       m = LINE.match(line.strip)
       next unless m
+      party = (wrapped_above(lines, i) + [ m[5].to_s.strip ] + wrapped_below(lines, i)).compact_blank.join
       { date: m[1], amount: CnBill.amount(m[2]), balance: CnBill.amount(m[3]),
-        summary: m[4], party: m[5].strip }
+        summary: m[4], party: party }
     end
   end
 
   private
+    def wrapped_above(lines, index)
+      fragments = []
+      (index - 1).downto(0) do |i|
+        break unless fragment?(lines[i])
+        fragments.unshift(lines[i].strip)
+      end
+      fragments
+    end
+
+    def wrapped_below(lines, index)
+      fragments = []
+      (index + 1).upto(lines.size - 1) do |i|
+        break unless fragment?(lines[i])
+        fragments << lines[i].strip
+      end
+      fragments
+    end
+
+    def fragment?(line)
+      return false if line.blank? || LINE.match?(line.strip)
+      line.index(/\S/).to_i >= FRAGMENT_COLUMN
+    end
+
     def extract_text(content)
       Tempfile.create([ "cn_cmb", ".pdf" ], binmode: true) do |file|
         file.write(content)

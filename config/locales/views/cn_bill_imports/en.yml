@@ -6,6 +6,7 @@ en:
       alipay: Alipay
       cmb: China Merchants Bank
     large_transfer_rule_name: Exclude large external transfers from reports
+    wealth_sweep_rule_name: Exclude wealth fund sweeps from reports
     new:
       title: Chinese Bill Import
       description: Upload WeChat Pay, Alipay and CMB bill exports. They are parsed,

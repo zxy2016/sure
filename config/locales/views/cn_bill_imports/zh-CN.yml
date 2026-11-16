@@ -6,6 +6,7 @@ zh-CN:
       alipay: 支付宝
       cmb: 招商银行
     large_transfer_rule_name: 大额对外转账不计入收支报表
+    wealth_sweep_rule_name: 理财申赎划转不计入收支报表
     new:
       title: 中国账单导入
       description: 上传微信、支付宝、招商银行导出的账单文件，系统会自动解析、清洗并归属到正确账户，随后进入标准导入审核流程。

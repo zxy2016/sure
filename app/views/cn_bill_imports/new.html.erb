@@ -30,7 +30,7 @@
           <%= t(".target_account") %>
         </label>
         <%= select_tag "cn_bill_accounts[#{channel}]",
-              options_from_collection_for_select(@accounts, :id, :name, @accounts.find { |a| a.name == config[:account_name] }&.id),
+              options_from_collection_for_select(@accounts, :id, :name, @accounts.find { |a| a.name == config[:account_name] || a.name.start_with?(config[:account_name]) }&.id),
               include_blank: t(".auto_create", name: config[:account_name]),
               id: "cn_bill_accounts_#{channel}",
               class: "w-full rounded-lg border border-primary bg-container px-3 py-2 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-gray-200" %>

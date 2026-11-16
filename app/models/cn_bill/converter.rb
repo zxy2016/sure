@@ -161,6 +161,11 @@ class CnBill::Converter
 
       if summary.include?("还款") || party.include?("还款")
         category = "信用卡还款"
+      elsif summary.match?(/朝朝宝|理财|基金/)
+        # Sweeps between checking and CMB's money-market fund are not
+        # income/spending; tag them so a rule excludes them from reports.
+        category = "理财申赎"
+        tags += "|#{CnBill::WEALTH_SWEEP_TAG}"
       elsif summary.include?("汇入汇款") && party.in?(@self_names)
         category, name = "工资", "工资（工资卡转入）"
       elsif party.include?("拼多多")

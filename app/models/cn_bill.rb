@@ -15,6 +15,7 @@ module CnBill
 
   LARGE_TRANSFER_THRESHOLD = 10_000
   LARGE_TRANSFER_TAG = "大额转账".freeze
+  WEALTH_SWEEP_TAG = "理财划转".freeze
   WALLET_CHANNEL_TAG = "零钱渠道".freeze
   SELF_TRANSFER_CATEGORY = "人情往来:转账".freeze
 

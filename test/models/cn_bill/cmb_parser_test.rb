@@ -36,4 +36,22 @@ class CnBill::CmbParserTest < ActiveSupport::TestCase
     parser = CnBill::CmbParser.new
     assert_equal 2, parser.parse_texts([ OCTOBER, OCTOBER ]).size
   end
+
+  test "joins counterparty text wrapped above and below the date line" do
+    text = <<~TEXT
+      2026-01-01 -- 2026-09-30
+      记账日期           货币         交易金额              联机余额             交易摘要                  对手信息
+                                                                                         待清算电子汇差-代销理财快赎
+      2026-01-02     CNY        2,571.88          2,571.88         朝朝宝转出
+                                                                                         投资
+
+      2026-01-02     CNY        -2,571.88         0.00             掌上生活还款                测试用户
+    TEXT
+    rows = CnBill::CmbParser.new.parse_text(text)
+    assert_equal 2, rows.size
+    assert_equal "待清算电子汇差-代销理财快赎投资", rows.first[:party]
+    assert_equal "朝朝宝转出", rows.first[:summary]
+    assert_equal BigDecimal("2571.88"), rows.first[:amount]
+    assert_equal "测试用户", rows.last[:party]
+  end
 end
