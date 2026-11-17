@@ -140,6 +140,22 @@ class CnBill::ConverterTest < ActiveSupport::TestCase
     assert_includes pension[:tags], CnBill::LARGE_TRANSFER_TAG
   end
 
+  test "external wealth purchases are excluded but never mirrored to the fund account" do
+    zzb = @family.accounts.create!(name: CnBill::SWEEP_ACCOUNT_NAME, balance: 0,
+                                   currency: "CNY", accountable: Depository.new(subtype: "savings"))
+    converter = CnBill::Converter.new(family: @family, cmb_account: @cmb, sweep_account: zzb)
+    result = converter.convert(cmb: [
+      bank(date: "2026-11-16", amount: "-60000", summary: "基金申购", party: "某基金公司"),
+      bank(date: "2026-11-16", amount: "-7998.86", summary: "朝朝宝转入", party: "待清算电子汇差")
+    ])
+    external = result.cmb.find { |r| r[:amount] == "-60000.00" }
+    assert_equal "理财申赎", external[:category]
+    assert_includes external[:tags], CnBill::LARGE_TRANSFER_TAG
+    assert_not_includes external[:tags], CnBill::WEALTH_SWEEP_TAG
+    assert_equal 1, result.sweep.size # only the 朝朝宝 leg mirrors
+    assert_equal "7998.86", result.sweep.first[:amount]
+  end
+
   private
     def ccb(summary:, amount:, counterparty:, date: "2026-01-12")
       { date: date, summary: summary, amount: BigDecimal(amount),
