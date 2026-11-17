@@ -117,7 +117,35 @@ class CnBill::ConverterTest < ActiveSupport::TestCase
     assert_equal "活期转入朝朝宝", in_leg[:name]
   end
 
+  test "ccb rows classify salary, sweeps, repayments and interest" do
+    result = @converter.convert(ccb: [
+      ccb(summary: "代理付款", amount: "10761.56", counterparty: "3719855101562295100010/渠道代发过渡户"),
+      ccb(summary: "跨行转出", amount: "-10761.57", counterparty: "6214855328267535/测试用户"),
+      ccb(summary: "跨行转出", amount: "-21340", counterparty: "6217856000045024824/戴倩倩"),
+      ccb(summary: "信用卡卡号还款", amount: "-17", counterparty: "6221682827462289/测试用户"),
+      ccb(summary: "利息存入", amount: "0.06", counterparty: ""),
+      ccb(summary: "个人养老金充值", amount: "-12000", counterparty: "6270202393950002244/测试用户")
+    ])
+
+    salary, self_transfer, external, repayment, interest, pension = result.ccb
+    assert_equal "工资", salary[:category]
+    assert_equal "工资（建行代发）", salary[:name]
+    assert_equal "本人账户划转", self_transfer[:name]
+    assert_not_includes self_transfer[:tags], CnBill::LARGE_TRANSFER_TAG
+    assert_equal "戴倩倩", external[:name]
+    assert_includes external[:tags], CnBill::LARGE_TRANSFER_TAG
+    assert_equal "信用卡还款", repayment[:category]
+    assert_equal "利息收益", interest[:category]
+    assert_equal "养老金缴存", pension[:category]
+    assert_includes pension[:tags], CnBill::LARGE_TRANSFER_TAG
+  end
+
   private
+    def ccb(summary:, amount:, counterparty:, date: "2026-01-12")
+      { date: date, summary: summary, amount: BigDecimal(amount),
+        balance: BigDecimal("1000"), memo: "", counterparty: counterparty }
+    end
+
     def wx(overrides = {})
       { date: "2026-10-07", type: "转账", party: "对方", product: "", direction: "支出",
         amount: BigDecimal("10"), method: "零钱", status: "支付成功", txn_id: SecureRandom.hex(4), note: "" }.merge(overrides)

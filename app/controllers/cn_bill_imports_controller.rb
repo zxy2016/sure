@@ -6,8 +6,8 @@ class CnBillImportsController < ApplicationController
   end
 
   def create
-    uploads = params.fetch(:cn_bill, {}).permit(:wechat, :alipay, :cmb)
-    account_ids = params.fetch(:cn_bill_accounts, {}).permit(:wechat, :alipay, :cmb)
+    uploads = params.fetch(:cn_bill, {}).permit(*CnBill::CHANNELS.keys)
+    account_ids = params.fetch(:cn_bill_accounts, {}).permit(*CnBill::CHANNELS.keys)
 
     if uploads.values.all?(&:blank?)
       redirect_to new_cn_bill_import_path, alert: t("cn_bill_imports.create.no_files")

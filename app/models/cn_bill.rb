@@ -10,7 +10,8 @@ module CnBill
   CHANNELS = {
     wechat: { account_name: "微信钱包", tag: "微信", accept: ".xlsx" },
     alipay: { account_name: "支付宝", tag: "支付宝", accept: ".csv" },
-    cmb:    { account_name: "招商银行储蓄卡", tag: "招行", accept: ".pdf" }
+    cmb:    { account_name: "招商银行储蓄卡", tag: "招行", accept: ".pdf" },
+    ccb:    { account_name: "建设银行工资卡", tag: "建行", accept: ".xls,.xlsx" }
   }.freeze
 
   LARGE_TRANSFER_THRESHOLD = 10_000

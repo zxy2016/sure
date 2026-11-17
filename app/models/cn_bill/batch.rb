@@ -11,13 +11,13 @@ class CnBill::Batch
 
   def initialize(family:, uploads:, account_ids: {})
     @family = family
-    @uploads = uploads.to_h.symbolize_keys.slice(:wechat, :alipay, :cmb)
+    @uploads = uploads.to_h.symbolize_keys.slice(*CnBill::CHANNELS.keys)
     @account_ids = account_ids.to_h.symbolize_keys
   end
 
   def process
     errors = []
-    parsed = { wechat: [], alipay: [], cmb: [] }
+    parsed = { wechat: [], alipay: [], cmb: [], ccb: [] }
     self_names = []
 
     @uploads.each do |channel, file|
@@ -33,6 +33,10 @@ class CnBill::Batch
       when :cmb
         parser = CnBill::CmbParser.new
         parsed[:cmb] = parser.parse(content)
+        self_names.concat(parser.account_names)
+      when :ccb
+        parser = CnBill::CcbParser.new
+        parsed[:ccb] = parser.parse(content)
         self_names.concat(parser.account_names)
       end
     rescue CnBill::Error, Zip::Error, CSV::MalformedCSVError => e
@@ -50,7 +54,7 @@ class CnBill::Batch
     ensure_exclusion_rules(sweep_account: sweep_account)
 
     imports = []
-    { wechat: result.wallet, alipay: result.alipay, cmb: result.cmb }.each do |channel, rows|
+    { wechat: result.wallet, alipay: result.alipay, cmb: result.cmb, ccb: result.ccb }.each do |channel, rows|
       next if rows.empty?
       imports << create_import(channel, accounts[channel], rows)
     end

@@ -28,6 +28,20 @@ class CnBillImportsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "支付宝", import.account.name
   end
 
+  test "creates configured import from ccb xls upload" do
+    assert_difference -> { @user.family.imports.count }, 1 do
+      post cn_bill_imports_url, params: {
+        cn_bill: { ccb: fixture_file_upload("cn_bills/ccb.xls", "application/vnd.ms-excel") }
+      }
+    end
+
+    import = @user.family.imports.ordered.first
+    assert_redirected_to import_path(import)
+    assert_equal 4, import.rows_count
+    assert_equal "建设银行工资卡", import.account.name
+    assert import.publishable?
+  end
+
   test "rejects empty submission" do
     assert_no_difference -> { @user.family.imports.count } do
       post cn_bill_imports_url, params: { cn_bill: {} }

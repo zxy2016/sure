@@ -2,6 +2,7 @@
 en:
   cn_bill_imports:
     channels:
+      ccb: China Construction Bank
       wechat: WeChat Pay
       alipay: Alipay
       cmb: China Merchants Bank
@@ -15,7 +16,9 @@ en:
       how_wechat: "WeChat: Me → Services → Wallet → Bills → FAQ → Download Bills → For personal reconciliation (xlsx)"
       how_alipay: "Alipay: Me → Bills → … → Transaction Statement → For personal reconciliation (csv)"
       how_cmb: "CMB app: search 流水打印 → choose account and period → send PDF to email"
+      how_ccb: "CCB app: Account → Checking details → Export (xls), or export via online banking"
       channels:
+        ccb: CCB statement
         wechat: WeChat Pay bill
         alipay: Alipay bill
         cmb: CMB statement

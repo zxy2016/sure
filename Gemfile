@@ -92,6 +92,7 @@ gem "webauthn", "~> 3.4"
 gem "websocket-driver", "~> 0.8"
 gem "activerecord-import"
 gem "rubyzip", "~> 3.4"
+gem "spreadsheet", "~> 1.3" # CCB (建行) exports legacy BIFF .xls statements
 gem "pdf-reader", "~> 2.12"
 
 # OpenID Connect, OAuth & SAML authentication

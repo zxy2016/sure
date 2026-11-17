@@ -14,7 +14,7 @@ class CnBill::Converter
     "医疗健康" => "医疗", "生活服务" => "生活服务", "宠物" => "宠物", "亲友代付" => "人情往来:代付"
   }.freeze
 
-  Result = Struct.new(:wallet, :alipay, :cmb, :sweep, :cards, :skipped, :matched, keyword_init: true)
+  Result = Struct.new(:wallet, :alipay, :cmb, :ccb, :sweep, :cards, :skipped, :matched, keyword_init: true)
 
   def initialize(family:, cmb_account: nil, self_names: [], sweep_account: nil)
     @family = family
@@ -23,10 +23,11 @@ class CnBill::Converter
     @sweep_account = sweep_account
   end
 
-  def convert(wechat: [], alipay: [], cmb: [])
+  def convert(wechat: [], alipay: [], cmb: [], ccb: [])
     wallet, wx_cmb, wx_cards, wx_skipped = convert_wechat(wechat)
     ali_rows, ali_cards, ali_skipped = convert_alipay(alipay)
     cmb_rows, matched = convert_cmb(cmb, wx_cmb)
+    ccb_rows = convert_ccb(ccb)
 
     # When the wealth fund account exists, emit its mirror legs so the
     # transfer matcher can pair both sides; otherwise sweeps stay tagged
@@ -42,11 +43,51 @@ class CnBill::Converter
       end
     end
 
-    Result.new(wallet: wallet, alipay: ali_rows, cmb: cmb_rows, sweep: sweep_rows,
+    Result.new(wallet: wallet, alipay: ali_rows, cmb: cmb_rows, ccb: ccb_rows, sweep: sweep_rows,
                cards: wx_cards + ali_cards, skipped: wx_skipped + ali_skipped, matched: matched)
   end
 
   private
+    # CCB rows carry signed amounts and a running balance, like the CMB PDF.
+    # Inter-bank legs pair with the CMB account through the transfer matcher.
+    def convert_ccb(rows)
+      rows.map do |r|
+        summary = r[:summary]
+        party = CnBill::CcbParser.party_name(r[:counterparty])
+        tags, category = "建行", "其他"
+        name = party.presence || summary
+
+        case summary
+        when "代理付款"
+          category, name = "工资", "工资（建行代发）"
+        when "利息存入"
+          category, name = "利息收益", "利息存入"
+        when "ATM存款"
+          category, name = "现金存入", "ATM存款"
+        when /还款/
+          category = "信用卡还款"
+        when /养老金/
+          category = "养老金缴存"
+          tags += "|#{CnBill::LARGE_TRANSFER_TAG}" # savings, not spending
+        when "消费"
+          category = "日常消费:其他"
+        else
+          if summary.include?("转") || summary.include?("汇")
+            category = CnBill::SELF_TRANSFER_CATEGORY
+            if party.in?(@self_names)
+              name = "本人账户划转"
+            elsif r[:amount].abs >= CnBill::LARGE_TRANSFER_THRESHOLD
+              tags += "|#{CnBill::LARGE_TRANSFER_TAG}"
+            end
+          end
+        end
+
+        notes = "#{summary} | 对手: #{r[:counterparty]} | 账户余额 #{r[:balance]}"
+        notes += " | #{r[:memo]}" if r[:memo].present?
+        CnBill.row(date: r[:date], amount: r[:amount], name: name, category: category, tags: tags, notes: notes)
+      end
+    end
+
     def convert_wechat(rows)
       wallet, cmb_detail, cards, skipped = [], [], [], []
       rows.each do |r|
